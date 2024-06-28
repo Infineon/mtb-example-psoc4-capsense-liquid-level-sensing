@@ -8,7 +8,7 @@
 *
 *
 *******************************************************************************
-* Copyright 2021-2023, Cypress Semiconductor Corporation (an Infineon company) or
+* Copyright 2023-2024, Cypress Semiconductor Corporation (an Infineon company) or
 * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
 * This software, including source code, documentation and related
@@ -60,8 +60,6 @@
 /* EZI2C interrupt priority must be higher than CAPSENSE interrupt. */
 #define EZI2C_INTR_PRIORITY       (2u)
 
-/* Threshold for determining if a sensor is submerged. */
-#define SENSORLIMIT         (71u) 
 #define LEVELMM_MAX         (153u)/* Max sensor height in mm */
 /* Height of a single sensor. Fixed precision 24.8 */
 #define SENSORHEIGHT        ((LEVELMM_MAX * 256) / (NUMSENSORS - 1)) 
@@ -101,8 +99,6 @@ int32_t levelMm = 0u;                         /* fixed precision 24.8 */
 /* Height of a single sensor. Fixed precision 24.8 */
 int32_t sensorHeight = SENSORHEIGHT;          
 
-/* Main loop delay in ms to control UART data log output speed */
-uint16_t delayMs = UART_DELAY;                
 /* Flag to signal when new sensor calibration values should be stored to EEPROM */
 uint8_t cal_flag = FALSE;                      
 
@@ -114,6 +110,9 @@ int32_t sensorEmptyOffset[LOGICAL_EM_EEPROM_SIZE] = {0u};
 /* Scaling factor to normalize sensor full scale counts. 0x0100 = 1.0 in fixed precision 8.8 */
 int16_t sensorScale[NUMSENSORS] = {0x01D0, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x01C0}; 
 int32_t sensorProcessed[NUMSENSORS] = {0u, 0u}; /* fixed precision 24.8 */
+
+/* Threshold for determining if a sensor is submerged. */
+int16_t sensorLimits[] = {900, 550, 480, 480, 500, 450, 440, 450, 450, 400, 400, 550};
 
 /*******************************************************************************
 * Global Definitions
@@ -154,8 +153,6 @@ int main(void)
     cy_stc_scb_uart_context_t CYBSP_UART_context;
     cy_en_em_eeprom_status_t em_eeprom_status;
 
-    uint8_t index;
-
     /* Initialize the device and board peripherals */
     result = cybsp_init();
 
@@ -175,7 +172,7 @@ int main(void)
     /* Send a string over serial terminal */
     Cy_SCB_UART_PutString(CYBSP_UART_HW, "\x1b[2J\x1b[;H");
     Cy_SCB_UART_PutString(CYBSP_UART_HW, "***************************************************************\r\n");
-    Cy_SCB_UART_PutString(CYBSP_UART_HW, "CE202479 - PSoC 4 Capacitive Liquid Level Sensing\r\n");
+    Cy_SCB_UART_PutString(CYBSP_UART_HW, "CE239150 - PSoC 4 Capacitive Liquid Level Sensing\r\n");
     Cy_SCB_UART_PutString(CYBSP_UART_HW, "***************************************************************\r\n\n");
 
     display_uart_commands();
@@ -191,7 +188,7 @@ int main(void)
     handle_error(em_eeprom_status, "Emulated EEPROM Initialization Error \r\n");
 
     /* Read stored empty offset values from EEPROM */
-    for(index = 0; index < NUMSENSORS; index++)
+    for(uint8_t index = 0; index < NUMSENSORS; index++)
     {
         sensorEmptyOffset[index] = ((volatile int16_t *)eepromEmptyOffset)[index];
     }
@@ -213,12 +210,16 @@ int main(void)
         if(CY_CAPSENSE_NOT_BUSY == Cy_CapSense_IsBusy(&cy_capsense_context))
         {
             /* Process all widgets */
-            Cy_CapSense_ProcessAllWidgets(&cy_capsense_context);
+            if (CY_CAPSENSE_STATUS_SUCCESS != Cy_CapSense_ProcessAllWidgets(&cy_capsense_context))
+            {
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, "Error in processing widgets\r\n");
+                CY_ASSERT(0u);
+            }
             /* Delay to control data logging rate */
-            Cy_SysLib_Delay(delayMs);
+            Cy_SysLib_Delay(UART_DELAY);
 
             /* Read and store new sensor raw counts, remove empty offset
-             * scalibration from sensor raw counts.
+             * calibration from sensor raw counts.
              */
             for(uint8_t i = 0; i < NUMSENSORS; i++)
             {
@@ -227,67 +228,68 @@ int main(void)
 
             }
 
-                /* Start scan for next iteration */
-                Cy_CapSense_ScanAllWidgets(&cy_capsense_context);
+            /* Start scan for next iteration */
+            if (CY_CAPSENSE_STATUS_SUCCESS != Cy_CapSense_ScanAllWidgets(&cy_capsense_context))
+            {
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, "Error in scanning widgets\r\n");
+                CY_ASSERT(0u);
+            }
+            if(cal_flag == TRUE)
+            {
+                cal_flag = FALSE;
+                store_calibration();
+            }
 
-                if(cal_flag == TRUE)
+            /* Remove empty offset calibration from sensor raw counts
+             * and normalize sensor full count values.
+             */
+            sensorActiveCount = 0;
+            for(uint8_t i = 0; i < NUMSENSORS; i++)
+            {
+                sensorDiff[i] -= sensorEmptyOffset[i];
+                if (sensorDiff[i] < 0)
                 {
-                    cal_flag = FALSE;
-                    store_calibration();
+                    sensorDiff[i] = 0;
                 }
-
-                /* Remove empty offset calibration from sensor raw counts 
-                 * and normalize sensor full count values.
-                 */
-                for(uint8_t i = 0; i < NUMSENSORS; i++)
-                {
-                    sensorDiff[i] -= sensorEmptyOffset[i];
-                    sensorProcessed[i] = (sensorDiff[i] * sensorScale[i]) >> 8;
-                }
-
+                sensorProcessed[i] = (sensorDiff[i] * sensorScale[i]) >> 8;
                 /* Find the number of submerged sensors */
-                sensorActiveCount = 0;
-                for(uint8_t i = 0; i < NUMSENSORS; i++)
+                if(sensorProcessed[i] > sensorLimits[i]/2)
                 {
-                    if(sensorProcessed[i] > SENSORLIMIT)
+                    /* First and last sensor are half the height of middle sensors. */
+                    if((i == 0) || (i == NUMSENSORS - 1))
                     {
-                        /* First and last sensor are half the height of middle sensors */
-                        if((i == 0) || (i == NUMSENSORS - 1))
-                        {
-                            sensorActiveCount += 1;
-                        }
-                        /* Middle sensors are twice the height of 1st and last sensors */
-                        else
-                        {
-                            sensorActiveCount += 2;
-                        }
+                        sensorActiveCount += 1;
+                    }
+                    /* Middle sensors are twice the height of 1st and last sensors */
+                    else
+                    {
+                        sensorActiveCount += 2;
                     }
                 }
 
-                /* Calculate liquid level height in mm */
-                levelMm = sensorActiveCount * (sensorHeight >> 1);
-                /* If level is near full value then round to full. 
-                 * Avoids fixed precision rounding errors.
-                 */
-                if(levelMm > ((int32_t)LEVELMM_MAX << 8) - (sensorHeight >> 2))
-                {
-                    levelMm = LEVELMM_MAX << 8;
-                }
+            }
+        }
 
-                /* Calculate level percent. Stored in fixed precision 
-                 * 24.8 format to hold fractional percent.
-                 */
-                levelPercent = (levelMm * 100) / LEVELMM_MAX;
+        /* Calculate liquid level height in mm */
+        levelMm = sensorActiveCount * (sensorHeight >> 1);
+        /* If level is near full value then round to full.
+         * Avoids fixed precision rounding errors.
+         */
+        if(levelMm > ((int32_t)LEVELMM_MAX << 8) - (sensorHeight >> 2))
+        {
+            levelMm = LEVELMM_MAX << 8;
+        }
 
-            /* Report level and process UART interfaces */
-            display_cur_liquid_level();
+        /* Calculate level percent. Stored in fixed precision
+         * 24.8 format to hold fractional percent.
+         */
+        levelPercent = (levelMm * 100) / LEVELMM_MAX;
+        /* Report level and process UART interfaces */
+        display_cur_liquid_level();
 #if CAPSENSE_TUNER_EN
-            /* Establishes synchronized communication with the CapSense Tuner tool */
-            Cy_CapSense_RunTuner(&cy_capsense_context);
+        /* Establishes synchronized communication with the CapSense Tuner tool */
+        Cy_CapSense_RunTuner(&cy_capsense_context);
 #endif
-
-       }
-
     }
 }
 
@@ -328,7 +330,7 @@ static void initialize_capsense(void)
     {
         /* This status could fail before tuning the sensors correctly.
          * Ensure that this function passes after the CAPSENSE sensors are tuned
-         * as per procedure give in the Readme.md file */
+         * as per procedure give in the README.md file */
     }
 }
 

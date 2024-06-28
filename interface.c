@@ -7,7 +7,7 @@
 * Related Document: README.md
 *
 *******************************************************************************
-* Copyright 2023, Cypress Semiconductor Corporation (an Infineon company) or
+* Copyright 2023-2024, Cypress Semiconductor Corporation (an Infineon company) or
 * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
 * This software, including source code, documentation and related
@@ -73,7 +73,7 @@ void display_uart_commands(void)
 {
     Cy_SCB_UART_PutString(CYBSP_UART_HW, "\n\r");
     Cy_SCB_UART_PutString(CYBSP_UART_HW, "Commands \n\r");
-    Cy_SCB_UART_PutString(CYBSP_UART_HW, "  stop - Stops dislaying data over UART.\n\r");
+    Cy_SCB_UART_PutString(CYBSP_UART_HW, "  stop - Stops displaying data over UART.\n\r");
     Cy_SCB_UART_PutString(CYBSP_UART_HW, "  cal - Stores empty container sensor values to EEPROM for calibration.\n\r");
     Cy_SCB_UART_PutString(CYBSP_UART_HW, "  basic - Outputs liquid level in mm and %.\n\r");
     Cy_SCB_UART_PutString(CYBSP_UART_HW, "  csv - Outputs intermediate computation values as well as liquid level in CSV format.\n\r");
@@ -261,60 +261,51 @@ void display_cur_liquid_level(void)
         display_decimal_val(((levelMm & 0x000000FF) * 10) >> 8, 0);
         Cy_SCB_UART_PutString(CYBSP_UART_HW, "\r\n");
     }
-    if(uartTxMode == UART_CSVINIT)
+    else if ((uartTxMode == UART_CSVINIT) || (uartTxMode == UART_CSV))
     {
-        for(i = 0; i < NUMSENSORS; i++)
+        if (uartTxMode == UART_CSVINIT)
         {
-            Cy_SCB_UART_PutString(CYBSP_UART_HW, "Raw");
-            display_decimal_val(i, 0);
-            Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
+            for(i = 0; i < NUMSENSORS; i++)
+            {
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, "Raw");
+                display_decimal_val(i, 0);
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, "Diff");
+                display_decimal_val(i, 0);
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, "Proc");
+                display_decimal_val(i, 0);
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");                            
+            }
+            Cy_SCB_UART_PutString(CYBSP_UART_HW, "SenActCnt,");
+
+            Cy_SCB_UART_PutString(CYBSP_UART_HW, "Level%, LevelMm");
+            Cy_SCB_UART_PutString(CYBSP_UART_HW, "\r\n");
+            uartTxMode = UART_CSV;
         }
-        for(i = 0; i < NUMSENSORS; i++)
+        else
         {
-            Cy_SCB_UART_PutString(CYBSP_UART_HW, "Diff");
-            display_decimal_val(i, 0);
+            for(i = 0; i < NUMSENSORS; i++)
+            {
+                display_decimal_val(sensorRaw[i], 0);
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
+                display_decimal_val(sensorDiff[i], 0);
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
+                display_decimal_val(sensorProcessed[i], 0);
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");                             
+            }
+            display_decimal_val(sensorActiveCount, 0);
             Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
-        }
-        for(i = 0; i < NUMSENSORS; i++)
-        {
-            Cy_SCB_UART_PutString(CYBSP_UART_HW, "Proc");
-            display_decimal_val(i, 0);
+
+            display_decimal_fixed_val(levelPercent, 8, 1);
             Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
+            /* Transmit current liquid level mm */
+            display_decimal_fixed_val(levelMm, 8, 1);
+            Cy_SCB_UART_PutString(CYBSP_UART_HW, "\r\n");
         }
 
-        Cy_SCB_UART_PutString(CYBSP_UART_HW, "SenActCnt,");
-
-        Cy_SCB_UART_PutString(CYBSP_UART_HW, "Level%, LevelMm");
-        Cy_SCB_UART_PutString(CYBSP_UART_HW, "\r\n");
-        uartTxMode = UART_CSV;
     }
-    else if(uartTxMode == UART_CSV)
-    {
-        for(i = 0; i < NUMSENSORS; i++)
-        {
-            display_decimal_val(sensorRaw[i], 0);
-            Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
-        }
-        for(i = 0; i < NUMSENSORS; i++)
-        {
-            display_decimal_val(sensorDiff[i], 0);
-            Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
-        }
-        for(i = 0; i < NUMSENSORS; i++)
-        {
-            display_decimal_val(sensorProcessed[i], 0);
-            Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
-        }
 
-        display_decimal_val(sensorActiveCount, 0);
-        Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
-
-        display_decimal_fixed_val(levelPercent, 8, 1);
-        Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
-        /* Transmit current liquid level mm */
-        display_decimal_fixed_val(levelMm, 8, 1);
-        Cy_SCB_UART_PutString(CYBSP_UART_HW, "\r\n");
-    }
     
     /* Looking for UART commands. */
     receive_uart_cmd();
@@ -419,9 +410,9 @@ void display_decimal_fixed_val(int32_t number, uint8_t fixed_shift, uint8_t num_
     int32_t dec_digits = 1;
 
     /* Check for out of range parameters */
-    if(fixed_shift > 32)
+    if(fixed_shift > 31)
     {
-        fixed_shift = 32;
+        fixed_shift = 31;
     }
     if(num_decimal > 9)
     {
@@ -440,7 +431,7 @@ void display_decimal_fixed_val(int32_t number, uint8_t fixed_shift, uint8_t num_
         {
             dec_digits *= 10;
         }
-        decimal_num = ((number & (0xFFFFFFFF >> (32 - fixed_shift))) * dec_digits) >> fixed_shift;
+        decimal_num = ((number & (0xFFFFFFFF >> (31 - fixed_shift))) * dec_digits) >> fixed_shift;
         display_decimal_val(decimal_num, num_decimal);
     }
 }
