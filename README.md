@@ -6,12 +6,13 @@ The firmware continuously measures the data from the 12-sensor (12 Rx) patterns 
 
 [View this README on GitHub.](https://github.com/Infineon/mtb-example-psoc4-capsense-liquid-level-sensing)
 
-[Provide feedback on this code example.](https://cypress.co1.qualtrics.com/jfe/form/SV_1NTns53sK2yiljn?Q_EED=eyJVbmlxdWUgRG9jIElkIjoiQ0UyMzkxNTAiLCJTcGVjIE51bWJlciI6IjAwMi0zOTE1MCIsIkRvYyBUaXRsZSI6IlBTb0MmdHJhZGU7IDQ6IENBUFNFTlNFJnRyYWRlOyBsaXF1aWQtbGV2ZWwgc2Vuc2luZyIsInJpZCI6InNkYWsiLCJEb2MgdmVyc2lvbiI6IjEuMS4wIiwiRG9jIExhbmd1YWdlIjoiRW5nbGlzaCIsIkRvYyBEaXZpc2lvbiI6Ik1DRCIsIkRvYyBCVSI6IklDVyIsIkRvYyBGYW1pbHkiOiJQU09DIn0=)
+[Provide feedback on this code example.](https://yourvoice.infineon.com/jfe/form/SV_1NTns53sK2yiljn?Q_EED=eyJVbmlxdWUgRG9jIElkIjoiQ0UyMzkxNTAiLCJTcGVjIE51bWJlciI6IjAwMi0zOTE1MCIsIkRvYyBUaXRsZSI6IlBTb0MmdHJhZGU7IDQ6IENBUFNFTlNFJnRyYWRlOyBsaXF1aWQtbGV2ZWwgc2Vuc2luZyIsInJpZCI6InNhbmRlZXAuYWtAaW5maW5lb24uY29tIiwiRG9jIHZlcnNpb24iOiIxLjEuMSIsIkRvYyBMYW5ndWFnZSI6IkVuZ2xpc2giLCJEb2MgRGl2aXNpb24iOiJNQ0QiLCJEb2MgQlUiOiJJQ1ciLCJEb2MgRmFtaWx5IjoiUFNPQyJ9)
 
 
 ## Requirements
 
 - [ModusToolbox&trade;](https://www.infineon.com/modustoolbox) v3.1 or later (tested with v3.1)
+- [ModusToolbox&trade; CAPSENSE&trade; and Multi-Sense Pack](https://softwaretools.infineon.com/tools/com.ifx.tb.tool.modustoolboxpackmultisense) for [ModusToolbox&trade;](https://www.infineon.com/modustoolbox) v3.7 or later
 - Board support package (BSP) minimum required version: 3.1.0
 - Programming language: C
 - Associated parts: [PSoC&trade; 4500S](https://www.infineon.com/cms/en/product/microcontroller/32-bit-psoc-arm-cortex-microcontroller/psoc-4-32-bit-arm-cortex-m0-mcu/)
@@ -29,7 +30,7 @@ The firmware continuously measures the data from the 12-sensor (12 Rx) patterns 
 This example requires the [CY8CKIT-022 CAPSENSE&trade; Liquid Level Sensing Shield](https://www.infineon.com/cms/en/product/evaluation-boards/cy8ckit-022/) to be interfaced with PSoC&trade; 4 MCU.
 ## Hardware setup
 
-This example uses the board's default configuration. See the kit user guide to ensure that the board is configured correctly. Remove the zero (0) ohm resistor R40, so that the signal on the sensor linked to P2[7] is detected. 
+This example uses the board's default configuration. See the kit user guide to ensure that the board is configured correctly. Remove the zero (0) ohm resistor R40, so that the signal on the sensor linked to P2[7] is detected.
 
 
 ## Software setup
@@ -157,7 +158,7 @@ For more details, see the [ModusToolbox&trade; tools package user guide](https:/
 
 2. Open a terminal program and select the KitProg3 COM port. Set the serial port parameters to 8N1 and 115200 baud.
 
-3. Interface the [CY8CKIT-022 CAPSENSE&trade; Liquid Level Sensing Shield](https://www.infineon.com/cms/en/product/evaluation-boards/cy8ckit-022/) to the kit by following the steps in the [CAPSENSE&trade; Liquid Level Sensing Shield user guide](https://www.infineon.com/dgdl/Infineon-CY8CKIT-022_CAPSENSE_LIQUID_LEVEL_SENSING_SHIELD_KIT_GUIDE-UserManual-v01_00-EN.pdf?fileId=8ac78c8c7d0d8da4017d0efb9f891197). 
+3. Interface the [CY8CKIT-022 CAPSENSE&trade; Liquid Level Sensing Shield](https://www.infineon.com/cms/en/product/evaluation-boards/cy8ckit-022/) to the kit by following the steps in the [CAPSENSE&trade; Liquid Level Sensing Shield user guide](https://www.infineon.com/dgdl/Infineon-CY8CKIT-022_CAPSENSE_LIQUID_LEVEL_SENSING_SHIELD_KIT_GUIDE-UserManual-v01_00-EN.pdf?fileId=8ac78c8c7d0d8da4017d0efb9f891197).
 
 4. Program the board using one of the following:
 
@@ -194,7 +195,7 @@ For more details, see the [ModusToolbox&trade; tools package user guide](https:/
 
    ![](images/terminal-liquid-level.png)
 
-   
+
    The following commands are supported:
    - **stop**: Stops the data output over the serial connection.
    - **cal**: Stores empty container sensor values to EEPROM for calibration of future readings.
@@ -281,6 +282,7 @@ Document title: *CE239150* – *PSoC&trade; 4: CAPSENSE&trade; liquid-level sens
  ------- | ---------------------
  1.0.0   | New code example
  1.1.0   | Updated the liquid level calculation logic and terminal image.
+ 1.1.1   | Minor README updates
  <br>
 
 All referenced product or service names and trademarks are the property of their respective owners.
