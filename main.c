@@ -1,40 +1,40 @@
 /******************************************************************************
 * File Name:   main.c
 *
-* Description: This is the source code for the PSoC 4 CAPSENSE liquid Level Sensing 
+* Description: This is the source code for the PSoC 4 CAPSENSE liquid Level Sensing
 *              Application for ModusToolbox.
 *
 * Related Document: See README.md
 *
 *
 *******************************************************************************
- * (c) 2023-2025, Infineon Technologies AG, or an affiliate of Infineon
- * Technologies AG. All rights reserved.
- * This software, associated documentation and materials ("Software") is
- * owned by Infineon Technologies AG or one of its affiliates ("Infineon")
- * and is protected by and subject to worldwide patent protection, worldwide
- * copyright laws, and international treaty provisions. Therefore, you may use
- * this Software only as provided in the license agreement accompanying the
- * software package from which you obtained this Software. If no license
- * agreement applies, then any use, reproduction, modification, translation, or
- * compilation of this Software is prohibited without the express written
- * permission of Infineon.
- *
- * Disclaimer: UNLESS OTHERWISE EXPRESSLY AGREED WITH INFINEON, THIS SOFTWARE
- * IS PROVIDED AS-IS, WITH NO WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
- * INCLUDING, BUT NOT LIMITED TO, ALL WARRANTIES OF NON-INFRINGEMENT OF
- * THIRD-PARTY RIGHTS AND IMPLIED WARRANTIES SUCH AS WARRANTIES OF FITNESS FOR A
- * SPECIFIC USE/PURPOSE OR MERCHANTABILITY.
- * Infineon reserves the right to make changes to the Software without notice.
- * You are responsible for properly designing, programming, and testing the
- * functionality and safety of your intended application of the Software, as
- * well as complying with any legal requirements related to its use. Infineon
- * does not guarantee that the Software will be free from intrusion, data theft
- * or loss, or other breaches ("Security Breaches"), and Infineon shall have
- * no liability arising out of any Security Breaches. Unless otherwise
- * explicitly approved by Infineon, the Software may not be used in any
- * application where a failure of the Product or any consequences of the use
- * thereof can reasonably be expected to result in personal injury.
+* (c) 2023-2026, Infineon Technologies AG, or an affiliate of Infineon
+* Technologies AG. All rights reserved.
+* This software, associated documentation and materials ("Software") is
+* owned by Infineon Technologies AG or one of its affiliates ("Infineon")
+* and is protected by and subject to worldwide patent protection, worldwide
+* copyright laws, and international treaty provisions. Therefore, you may use
+* this Software only as provided in the license agreement accompanying the
+* software package from which you obtained this Software. If no license
+* agreement applies, then any use, reproduction, modification, translation, or
+* compilation of this Software is prohibited without the express written
+* permission of Infineon.
+*
+* Disclaimer: UNLESS OTHERWISE EXPRESSLY AGREED WITH INFINEON, THIS SOFTWARE
+* IS PROVIDED AS-IS, WITH NO WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+* INCLUDING, BUT NOT LIMITED TO, ALL WARRANTIES OF NON-INFRINGEMENT OF
+* THIRD-PARTY RIGHTS AND IMPLIED WARRANTIES SUCH AS WARRANTIES OF FITNESS FOR A
+* SPECIFIC USE/PURPOSE OR MERCHANTABILITY.
+* Infineon reserves the right to make changes to the Software without notice.
+* You are responsible for properly designing, programming, and testing the
+* functionality and safety of your intended application of the Software, as
+* well as complying with any legal requirements related to its use. Infineon
+* does not guarantee that the Software will be free from intrusion, data theft
+* or loss, or other breaches ("Security Breaches"), and Infineon shall have
+* no liability arising out of any Security Breaches. Unless otherwise
+* explicitly approved by Infineon, the Software may not be used in any
+* application where a failure of the Product or any consequences of the use
+* thereof can reasonably be expected to result in personal injury.
 *******************************************************************************/
 
 /*******************************************************************************
@@ -47,29 +47,32 @@
 #include "cy_em_eeprom.h"
 #include "interface.h"
 
-
 /*******************************************************************************
 * Macros
 *******************************************************************************/
+#if defined(CY_DEVICE_SERIES_PSOC_4100S_MAX)
+#define CAPSENSE_MSC0_INTR_PRIORITY      (3u)
+#define CAPSENSE_MSC1_INTR_PRIORITY      (3u)
+#endif
+
+#if defined(CY_DEVICE_SERIES_PSOC_4500S)
 #define CAPSENSE_INTR_PRIORITY    (3u)
-#define CY_ASSERT_FAILED          (0u)
+#endif
+
+#define CY_ASSERT_FAILED                 (0u)
 
 /* EZI2C interrupt priority must be higher than CAPSENSE interrupt. */
-#define EZI2C_INTR_PRIORITY       (2u)
+#define EZI2C_INTR_PRIORITY              (2u)
 
-#define LEVELMM_MAX         (153u)/* Max sensor height in mm */
+#define LEVELMM_MAX                      (153u) /* Max sensor height in mm */
 /* Height of a single sensor. Fixed precision 24.8 */
-#define SENSORHEIGHT        ((LEVELMM_MAX * 256) / (NUMSENSORS - 1)) 
-
-/* EEPROM constants */
-#define Em_EEPROM_FLASH_BASE_ADDR        (CYDEV_FLASH_BASE)
-#define Em_EEPROM_FLASH_SIZE             (CYDEV_FLASH_SIZE)
+#define SENSORHEIGHT                     ((LEVELMM_MAX * 256) / (NUMSENSORS - 1))
 
 /* UART constants */
-#define UART_DELAY          (100u)  /* Delay in ms to control data logging rate.*/
+#define UART_DELAY                       (1000u)  /* Delay in ms to control data logging rate.*/
 
 /* Enable this, if Tuner needs to be enabled */
-#define CAPSENSE_TUNER_EN                            (0u)
+#define CAPSENSE_TUNER_EN                (1u)
 
 /*******************************************************************************
 * Global Variables
@@ -78,11 +81,11 @@
 /* Emulated EEPROM configuration and context structure. */
 cy_stc_eeprom_config_t em_eeprom_config =
 {
-    .eepromSize         = EM_EEPROM_SIZE,           /* 256 bytes */
-    .blockingWrite      = BLOCKING_WRITE,           /* Blocking writes enabled */
-    .redundantCopy      = REDUNDANT_COPY,           /* Redundant copy enabled */
-    .wearLevelingFactor = WEAR_LEVELLING_FACTOR,    /* Wear levelling factor of 2 */
-    .simpleMode         = SIMPLE_MODE,              /* Simple mode disabled */
+    .eepromSize         = EM_EEPROM_SIZE,
+    .blockingWrite      = BLOCKING_WRITE,
+    .redundantCopy      = REDUNDANT_COPY,
+    .wearLevelingFactor = WEAR_LEVELLING_FACTOR,
+    .simpleMode         = SIMPLE_MODE,
 };
 
 /* Sensor counts when empty to calculate diff counts. Loaded from EEPROM array */
@@ -90,30 +93,28 @@ CY_ALIGN(CY_EM_EEPROM_FLASH_SIZEOF_ROW)
 const uint8_t eepromEmptyOffset[EM_EEPROM_PHYSICAL_SIZE] = {0u};
 
 /* Number of sensors currently submerged */
-uint8_t sensorActiveCount = 0u;               
+uint8_t sensorActiveCount = 0u;
 int32_t levelPercent = 0u;                    /* fixed precision 24.8 */
 int32_t levelMm = 0u;                         /* fixed precision 24.8 */
 /* Height of a single sensor. Fixed precision 24.8 */
-int32_t sensorHeight = SENSORHEIGHT;          
+int32_t sensorHeight = SENSORHEIGHT;
 
 /* Flag to signal when new sensor calibration values should be stored to EEPROM */
-uint8_t cal_flag = FALSE;                      
+uint8_t cal_flag = FALSE;
 
 /* Liquid Level variables */
 int32_t sensorRaw[NUMSENSORS] = {0u};         /* Sensor raw counts */
 int32_t sensorDiff[NUMSENSORS] = {0u};        /* Sensor difference counts */
 /* Sensor counts when empty to calculate diff counts. Loaded from EEPROM array */
-int32_t sensorEmptyOffset[LOGICAL_EM_EEPROM_SIZE] = {0u}; 
+int32_t sensorEmptyOffset[NUMSENSORS] = {0u};
 /* Scaling factor to normalize sensor full scale counts. 0x0100 = 1.0 in fixed precision 8.8 */
-int16_t sensorScale[NUMSENSORS] = {0x01D0, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x01C0}; 
+int16_t sensorScale[NUMSENSORS] = {0x01D0, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x0100, 0x01C0};
 int32_t sensorProcessed[NUMSENSORS] = {0u, 0u}; /* fixed precision 24.8 */
 
 /* Threshold for determining if a sensor is submerged. */
 int16_t sensorLimits[] = {900, 550, 480, 480, 500, 450, 440, 450, 450, 400, 400, 550};
 
-/*******************************************************************************
-* Global Definitions
-*******************************************************************************/
+/* Global Definitions */
 cy_stc_scb_ezi2c_context_t ezi2c_context;
 cy_stc_eeprom_context_t em_eeprom_context;
 
@@ -121,13 +122,21 @@ cy_stc_eeprom_context_t em_eeprom_context;
 * Function Prototypes
 *******************************************************************************/
 static void initialize_capsense(void);
+
+#if defined(CY_DEVICE_SERIES_PSOC_4100S_MAX)
+static void capsense_msc0_isr(void);
+static void capsense_msc1_isr(void);
+#endif
+
+#if defined(CY_DEVICE_SERIES_PSOC_4500S)
 static void capsense_isr(void);
+#endif
+
 
 #if CAPSENSE_TUNER_EN
 static void ezi2c_isr(void);
 static void initialize_capsense_tuner(void);
 #endif
-
 
 /*******************************************************************************
 * Function Name: main
@@ -152,8 +161,6 @@ int main(void)
 
     /* Initialize the device and board peripherals */
     result = cybsp_init();
-
-    /* Board init failed. Stop program execution */
     if (result != CY_RSLT_SUCCESS)
     {
         CY_ASSERT(CY_ASSERT_FAILED);
@@ -173,22 +180,32 @@ int main(void)
     Cy_SCB_UART_PutString(CYBSP_UART_HW, "***************************************************************\r\n\n");
 
     display_uart_commands();
-    display_current_cal_val();
 
-    /* Initialize the flash start address in Emulated EEPROM configuration
-     * structure
-     */
+    /* Initialize the flash start address in Emulated EEPROM configuration */
     em_eeprom_config.userFlashStartAddr = (uint32_t) eepromEmptyOffset;
 
     /* Initialize Emulated EEPROM */
     em_eeprom_status = Cy_Em_EEPROM_Init(&em_eeprom_config, &em_eeprom_context);
-    handle_error(em_eeprom_status, "Emulated EEPROM Initialization Error \r\n");
+    if (em_eeprom_status != CY_EM_EEPROM_SUCCESS)
+    {
+        handle_error(em_eeprom_status, "Emulated EEPROM Initialization Error \r\n");
+    }
 
     /* Read stored empty offset values from EEPROM */
-    for(uint8_t index = 0; index < NUMSENSORS; index++)
+    em_eeprom_status = Cy_Em_EEPROM_Read(LOGICAL_EM_EEPROM_START, sensorEmptyOffset, LOGICAL_EM_EEPROM_SIZE, &em_eeprom_context);
+    if (em_eeprom_status != CY_EM_EEPROM_SUCCESS)
     {
-        sensorEmptyOffset[index] = ((volatile int16_t *)eepromEmptyOffset)[index];
+        /* Handle first-boot or bad data: default to zeros */
+        memset(sensorEmptyOffset, 0, sizeof(sensorEmptyOffset));
+        Cy_SCB_UART_PutString(CYBSP_UART_HW, "No valid EEPROM data found. Using defaults (zeros).\r\n");
     }
+    else
+    {
+        Cy_SCB_UART_PutString(CYBSP_UART_HW, "EEPROM data loaded successfully.\r\n");
+    }
+
+    /* Display calibration values after loading from EEPROM */
+    display_current_cal_val();
 
 #if CAPSENSE_TUNER_EN
     /* Initialize EZI2C */
@@ -203,8 +220,8 @@ int main(void)
 
     for (;;)
     {
-        /* Check for CapSense scan complete*/
-        if(CY_CAPSENSE_NOT_BUSY == Cy_CapSense_IsBusy(&cy_capsense_context))
+        /* Check for CapSense scan complete */
+        if (CY_CAPSENSE_NOT_BUSY == Cy_CapSense_IsBusy(&cy_capsense_context))
         {
             /* Process all widgets */
             if (CY_CAPSENSE_STATUS_SUCCESS != Cy_CapSense_ProcessAllWidgets(&cy_capsense_context))
@@ -215,14 +232,11 @@ int main(void)
             /* Delay to control data logging rate */
             Cy_SysLib_Delay(UART_DELAY);
 
-            /* Read and store new sensor raw counts, remove empty offset
-             * calibration from sensor raw counts.
-             */
-            for(uint8_t i = 0; i < NUMSENSORS; i++)
+            /* Read and store new sensor raw counts, remove empty offset calibration */
+            for (uint8_t i = 0; i < NUMSENSORS; i++)
             {
                 sensorRaw[i] = cy_capsense_tuner.sensorContext[i].raw;
                 sensorDiff[i] = sensorRaw[i];
-
             }
 
             /* Start scan for next iteration */
@@ -231,17 +245,16 @@ int main(void)
                 Cy_SCB_UART_PutString(CYBSP_UART_HW, "Error in scanning widgets\r\n");
                 CY_ASSERT(0u);
             }
-            if(cal_flag == TRUE)
+
+            if (cal_flag == TRUE)
             {
                 cal_flag = FALSE;
                 store_calibration();
             }
 
-            /* Remove empty offset calibration from sensor raw counts
-             * and normalize sensor full count values.
-             */
+            /* Remove empty offset calibration and normalize sensor counts */
             sensorActiveCount = 0;
-            for(uint8_t i = 0; i < NUMSENSORS; i++)
+            for (uint8_t i = 0; i < NUMSENSORS; i++)
             {
                 sensorDiff[i] -= sensorEmptyOffset[i];
                 if (sensorDiff[i] < 0)
@@ -250,39 +263,33 @@ int main(void)
                 }
                 sensorProcessed[i] = (sensorDiff[i] * sensorScale[i]) >> 8;
                 /* Find the number of submerged sensors */
-                if(sensorProcessed[i] > sensorLimits[i]/2)
+                if (sensorProcessed[i] > sensorLimits[i] / 2)
                 {
-                    /* First and last sensor are half the height of middle sensors. */
-                    if((i == 0) || (i == NUMSENSORS - 1))
+                    /* First and last sensor are half the height of middle sensors */
+                    if ((i == 0) || (i == NUMSENSORS - 1))
                     {
                         sensorActiveCount += 1;
                     }
-                    /* Middle sensors are twice the height of 1st and last sensors */
                     else
                     {
                         sensorActiveCount += 2;
                     }
                 }
-
             }
+
+            /* Calculate liquid level height in mm */
+            levelMm = sensorActiveCount * (sensorHeight >> 1);
+            if (levelMm > ((int32_t)LEVELMM_MAX << 8) - (sensorHeight >> 2))
+            {
+                levelMm = LEVELMM_MAX << 8;
+            }
+
+            /* Calculate level percent in fixed precision 24.8 */
+            levelPercent = (levelMm * 100) / LEVELMM_MAX;
+            /* Report level and process UART interfaces */
+            display_cur_liquid_level();
         }
 
-        /* Calculate liquid level height in mm */
-        levelMm = sensorActiveCount * (sensorHeight >> 1);
-        /* If level is near full value then round to full.
-         * Avoids fixed precision rounding errors.
-         */
-        if(levelMm > ((int32_t)LEVELMM_MAX << 8) - (sensorHeight >> 2))
-        {
-            levelMm = LEVELMM_MAX << 8;
-        }
-
-        /* Calculate level percent. Stored in fixed precision
-         * 24.8 format to hold fractional percent.
-         */
-        levelPercent = (levelMm * 100) / LEVELMM_MAX;
-        /* Report level and process UART interfaces */
-        display_cur_liquid_level();
 #if CAPSENSE_TUNER_EN
         /* Establishes synchronized communication with the CapSense Tuner tool */
         Cy_CapSense_RunTuner(&cy_capsense_context);
@@ -294,8 +301,7 @@ int main(void)
 * Function Name: initialize_capsense
 ********************************************************************************
 * Summary:
-*  This function initializes the CAPSENSE and configures the CAPSENSE
-*  interrupt.
+*  This function initializes the CAPSENSE and configures the CAPSENSE interrupt.
 *
 *******************************************************************************/
 static void initialize_capsense(void)
@@ -303,15 +309,50 @@ static void initialize_capsense(void)
     cy_capsense_status_t status = CY_CAPSENSE_STATUS_SUCCESS;
 
     /* CAPSENSE interrupt configuration */
+
+#if defined(CY_DEVICE_SERIES_PSOC_4100S_MAX)    
+    const cy_stc_sysint_t capsense_msc0_interrupt_config =
+    {
+        .intrSrc = CY_MSC0_IRQ,
+        .intrPriority = CAPSENSE_MSC0_INTR_PRIORITY,
+    };
+
+    const cy_stc_sysint_t capsense_msc1_interrupt_config =
+    {
+        .intrSrc = CY_MSC1_IRQ,
+        .intrPriority = CAPSENSE_MSC1_INTR_PRIORITY,
+    };
+#endif
+
+#if defined(CY_DEVICE_SERIES_PSOC_4500S)
     const cy_stc_sysint_t capsense_interrupt_config =
     {
         .intrSrc = CYBSP_CAPSENSE_IRQ,
         .intrPriority = CAPSENSE_INTR_PRIORITY,
     };
 
-    /* Capture the CSD HW block and initialize it to the default state. */
+#endif
+
+    /* Capture the CSD HW block and initialize it to the default state */
     status = Cy_CapSense_Init(&cy_capsense_context);
 
+#if defined(CY_DEVICE_SERIES_PSOC_4100S_MAX)
+    if (CY_CAPSENSE_STATUS_SUCCESS == status)
+    {
+        /* Initialize CAPSENSE interrupt */
+        Cy_SysInt_Init(&capsense_msc0_interrupt_config, capsense_msc0_isr);
+        NVIC_ClearPendingIRQ(capsense_msc0_interrupt_config.intrSrc);
+        NVIC_EnableIRQ(capsense_msc0_interrupt_config.intrSrc);
+
+        Cy_SysInt_Init(&capsense_msc1_interrupt_config, capsense_msc1_isr);
+        NVIC_ClearPendingIRQ(capsense_msc1_interrupt_config.intrSrc);
+        NVIC_EnableIRQ(capsense_msc1_interrupt_config.intrSrc);
+        /* Initialize the CAPSENSE firmware modules */
+        status = Cy_CapSense_Enable(&cy_capsense_context);
+    }
+#endif
+
+#if defined(CY_DEVICE_SERIES_PSOC_4500S)
     if (CY_CAPSENSE_STATUS_SUCCESS == status)
     {
         /* Initialize CAPSENSE interrupt */
@@ -323,15 +364,41 @@ static void initialize_capsense(void)
         status = Cy_CapSense_Enable(&cy_capsense_context);
     }
 
-    if(status != CY_CAPSENSE_STATUS_SUCCESS)
+#endif
+
+    if (status != CY_CAPSENSE_STATUS_SUCCESS)
     {
-        /* This status could fail before tuning the sensors correctly.
-         * Ensure that this function passes after the CAPSENSE sensors are tuned
-         * as per procedure give in the README.md file */
+        Cy_SCB_UART_PutString(CYBSP_UART_HW, "CAPSENSE initialization failed. Check sensor tuning.\r\n");
     }
 }
 
+#if defined(CY_DEVICE_SERIES_PSOC_4100S_MAX)   
+/*******************************************************************************
+* Function Name: capsense_msc0_isr
+********************************************************************************
+* Summary:
+* Wrapper function for handling interrupts from CAPSENSE MSC0 block.
+*
+*******************************************************************************/
+static void capsense_msc0_isr(void)
+{
+    Cy_CapSense_InterruptHandler(CY_MSC0_HW, &cy_capsense_context);
+}
 
+/*******************************************************************************
+* Function Name: capsense_msc1_isr
+********************************************************************************
+* Summary:
+* Wrapper function for handling interrupts from CAPSENSE MSC1 block.
+*
+*******************************************************************************/
+static void capsense_msc1_isr(void)
+{
+    Cy_CapSense_InterruptHandler(CY_MSC1_HW, &cy_capsense_context);
+}
+#endif
+
+#if defined(CY_DEVICE_SERIES_PSOC_4500S)   
 /*******************************************************************************
 * Function Name: capsense_isr
 ********************************************************************************
@@ -343,13 +410,14 @@ static void capsense_isr(void)
 {
     Cy_CapSense_InterruptHandler(CYBSP_CAPSENSE_HW, &cy_capsense_context);
 }
+#endif
 
 #if CAPSENSE_TUNER_EN
 /*******************************************************************************
 * Function Name: initialize_capsense_tuner
 ********************************************************************************
 * Summary:
-* - EZI2C module to communicate with the CAPSENSE Tuner tool.
+*  Initializes EZI2C module to communicate with the CAPSENSE Tuner tool.
 *
 *******************************************************************************/
 static void initialize_capsense_tuner(void)
@@ -366,7 +434,7 @@ static void initialize_capsense_tuner(void)
     /* Initialize the EzI2C firmware module */
     status = Cy_SCB_EZI2C_Init(CYBSP_EZI2C_HW, &CYBSP_EZI2C_config, &ezi2c_context);
 
-    if(status != CY_SCB_EZI2C_SUCCESS)
+    if (status != CY_SCB_EZI2C_SUCCESS)
     {
         CY_ASSERT(CY_ASSERT_FAILED);
     }
@@ -374,25 +442,19 @@ static void initialize_capsense_tuner(void)
     Cy_SysInt_Init(&ezi2c_intr_config, ezi2c_isr);
     NVIC_EnableIRQ(ezi2c_intr_config.intrSrc);
 
-    /* Set the CAPSENSE data structure as the I2C buffer to be exposed to the
-     * master on primary slave address interface. Any I2C host tools such as
-     * the Tuner or the Bridge Control Panel can read this buffer but you can
-     * connect only one tool at a time.
-     */
+    /* Set the CAPSENSE data structure as the I2C buffer */
     Cy_SCB_EZI2C_SetBuffer1(CYBSP_EZI2C_HW, (uint8_t *)&cy_capsense_tuner,
                             sizeof(cy_capsense_tuner), sizeof(cy_capsense_tuner),
                             &ezi2c_context);
 
-    /* Enables the SCB block for the EZI2C operation. */
+    /* Enable the SCB block for EZI2C operation */
     Cy_SCB_EZI2C_Enable(CYBSP_EZI2C_HW);
 
-    /* EZI2C initialization failed */
-    if(status != CY_SCB_EZI2C_SUCCESS)
+    if (status != CY_SCB_EZI2C_SUCCESS)
     {
         CY_ASSERT(CY_ASSERT_FAILED);
     }
 }
-
 
 /*******************************************************************************
 * Function Name: ezi2c_isr
@@ -405,7 +467,6 @@ static void ezi2c_isr(void)
 {
     Cy_SCB_EZI2C_Interrupt(CYBSP_EZI2C_HW, &ezi2c_context);
 }
-
 #endif /* CAPSENSE_TUNER_EN */
 
 /* [] END OF FILE */

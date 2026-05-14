@@ -7,50 +7,53 @@
 * Related Document: README.md
 *
 *******************************************************************************
- * (c) 2023-2025, Infineon Technologies AG, or an affiliate of Infineon
- * Technologies AG. All rights reserved.
- * This software, associated documentation and materials ("Software") is
- * owned by Infineon Technologies AG or one of its affiliates ("Infineon")
- * and is protected by and subject to worldwide patent protection, worldwide
- * copyright laws, and international treaty provisions. Therefore, you may use
- * this Software only as provided in the license agreement accompanying the
- * software package from which you obtained this Software. If no license
- * agreement applies, then any use, reproduction, modification, translation, or
- * compilation of this Software is prohibited without the express written
- * permission of Infineon.
- *
- * Disclaimer: UNLESS OTHERWISE EXPRESSLY AGREED WITH INFINEON, THIS SOFTWARE
- * IS PROVIDED AS-IS, WITH NO WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
- * INCLUDING, BUT NOT LIMITED TO, ALL WARRANTIES OF NON-INFRINGEMENT OF
- * THIRD-PARTY RIGHTS AND IMPLIED WARRANTIES SUCH AS WARRANTIES OF FITNESS FOR A
- * SPECIFIC USE/PURPOSE OR MERCHANTABILITY.
- * Infineon reserves the right to make changes to the Software without notice.
- * You are responsible for properly designing, programming, and testing the
- * functionality and safety of your intended application of the Software, as
- * well as complying with any legal requirements related to its use. Infineon
- * does not guarantee that the Software will be free from intrusion, data theft
- * or loss, or other breaches ("Security Breaches"), and Infineon shall have
- * no liability arising out of any Security Breaches. Unless otherwise
- * explicitly approved by Infineon, the Software may not be used in any
- * application where a failure of the Product or any consequences of the use
- * thereof can reasonably be expected to result in personal injury.
+* (c) 2023-2026, Infineon Technologies AG, or an affiliate of Infineon
+* Technologies AG. All rights reserved.
+* This software, associated documentation and materials ("Software") is
+* owned by Infineon Technologies AG or one of its affiliates ("Infineon")
+* and is protected by and subject to worldwide patent protection, worldwide
+* copyright laws, and international treaty provisions. Therefore, you may use
+* this Software only as provided in the license agreement accompanying the
+* software package from which you obtained this Software. If no license
+* agreement applies, then any use, reproduction, modification, translation, or
+* compilation of this Software is prohibited without the express written
+* permission of Infineon.
+*
+* Disclaimer: UNLESS OTHERWISE EXPRESSLY AGREED WITH INFINEON, THIS SOFTWARE
+* IS PROVIDED AS-IS, WITH NO WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+* INCLUDING, BUT NOT LIMITED TO, ALL WARRANTIES OF NON-INFRINGEMENT OF
+* THIRD-PARTY RIGHTS AND IMPLIED WARRANTIES SUCH AS WARRANTIES OF FITNESS FOR A
+* SPECIFIC USE/PURPOSE OR MERCHANTABILITY.
+* Infineon reserves the right to make changes to the Software without notice.
+* You are responsible for properly designing, programming, and testing the
+* functionality and safety of your intended application of the Software, as
+* well as complying with any legal requirements related to its use. Infineon
+* does not guarantee that the Software will be free from intrusion, data theft
+* or loss, or other breaches ("Security Breaches"), and Infineon shall have
+* no liability arising out of any Security Breaches. Unless otherwise
+* explicitly approved by Infineon, the Software may not be used in any
+* application where a failure of the Product or any consequences of the use
+* thereof can reasonably be expected to result in personal injury.
 *******************************************************************************/
+
+/*******************************************************************************
+ * Include header files
+ ******************************************************************************/
 #include "cy_pdl.h"
 #include "cybsp.h"
 #include "cycfg.h"
 #include "interface.h"
 #include "cy_em_eeprom.h"
-
-#include<stdio.h>
+#include <stdio.h>
+#include <string.h>
 
 /*******************************************************************************
 * Global Variables
 *******************************************************************************/
-/* UART variables */
 uint8_t uartTxMode = UART_BASIC;
 uint8_t storeSampleFlag = FALSE;
 uint8_t resetSampleFlag = FALSE;
-int16_t arrayAxisLabel[NUM_SAMPLES] = {-5,0,10,20,30,40,50,60,70,80,90,100,110,120,130,140,150,153,160,0};
+int16_t arrayAxisLabel[NUM_SAMPLES] = {-5, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 153, 160, 0};
 
 /*******************************************************************************
 * Function Name: display_uart_commands
@@ -64,8 +67,6 @@ int16_t arrayAxisLabel[NUM_SAMPLES] = {-5,0,10,20,30,40,50,60,70,80,90,100,110,1
 * Return:
 *  void
 *******************************************************************************/
-
-/* Transmit list of available commands */
 void display_uart_commands(void)
 {
     Cy_SCB_UART_PutString(CYBSP_UART_HW, "\n\r");
@@ -96,7 +97,7 @@ void display_current_cal_val(void)
     uint8_t i;
 
     Cy_SCB_UART_PutString(CYBSP_UART_HW, "EmptyCal=");
-    for(i = 0; i < NUMSENSORS; i++)
+    for (i = 0; i < NUMSENSORS; i++)
     {
         display_decimal_val(sensorEmptyOffset[i], 0);
         Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
@@ -128,35 +129,32 @@ void display_decimal_val(int32_t number, int8_t leading_zeros)
     const int32_t decimal[] = {1000000000, 100000000, 10000000, 1000000, 100000, 10000, 1000, 100, 10, 1};
 
     /* Check for out of range parameters */
-    if(leading_zeros > 10)
+    if (leading_zeros > 10)
     {
         leading_zeros = 10;
     }
-    if(number < 0)
+    if (number < 0)
     {
         number *= -1;
         Cy_SCB_UART_Put(CYBSP_UART_HW, '-');
     }
 
     /* Loop through each digit and subtract out represented decimal quantity */
-    for(i = 0; i <= 9; i++)
+    for (i = 0; i <= 9; i++)
     {
         digit = 0;
-        while(number >= decimal[i])
+        while (number >= decimal[i])
         {
             zero_flag = 1;
             number -= decimal[i];
             digit++;
         }
-        /* display digit (and any following) if digit > 0, 1s digit = 0, or
-         *  we have reached the number of forced leading zeros.
-         */
-        if((zero_flag == 1) || (i == 9) || (i >= (10 - leading_zeros)))
+        /* Display digit if non-zero, last digit, or within leading zeros */
+        if ((zero_flag == 1) || (i == 9) || (i >= (10 - leading_zeros)))
         {
             while (!Cy_SCB_UART_Put(CYBSP_UART_HW, digit + 48));
         }
     }
-
 }
 
 /*******************************************************************************
@@ -177,28 +175,41 @@ void store_calibration(void)
 {
     uint8_t i;
     cy_en_em_eeprom_status_t em_eeprom_status;
+    int32_t tempBuffer[NUMSENSORS];
 
     /* Calculate offset for each sensor */
-    for(i = 0; i < NUMSENSORS; i++)
+    for (i = 0; i < NUMSENSORS; i++)
     {
-          sensorEmptyOffset[i] = sensorDiff[i];
+        sensorEmptyOffset[i] = sensorDiff[i];
     }
     display_current_cal_val();
 
-    /* Store new cal values */
-    /* Write initial data to Emulated EEPROM. */
-    em_eeprom_status = Cy_Em_EEPROM_Write(LOGICAL_EM_EEPROM_START,
-                                             sensorEmptyOffset,
-                                             LOGICAL_EM_EEPROM_SIZE,
-                                             &em_eeprom_context);
+    /* Store new calibration values */
+    em_eeprom_status = Cy_Em_EEPROM_Write(LOGICAL_EM_EEPROM_START, sensorEmptyOffset, LOGICAL_EM_EEPROM_SIZE, &em_eeprom_context);
+    if (em_eeprom_status != CY_EM_EEPROM_SUCCESS)
+    {
+        handle_error(em_eeprom_status, "Emulated EEPROM Write failed \r\n");
+    }
 
-    /* EEPROM Error handler */
-    handle_error(em_eeprom_status, "Emulated EEPROM Write failed \r\n");
+    /* Verify the write by reading back */
+    em_eeprom_status = Cy_Em_EEPROM_Read(LOGICAL_EM_EEPROM_START, tempBuffer, LOGICAL_EM_EEPROM_SIZE, &em_eeprom_context);
+    if (em_eeprom_status != CY_EM_EEPROM_SUCCESS)
+    {
+        Cy_SCB_UART_PutString(CYBSP_UART_HW, "EEPROM read-back verification failed \r\n");
+    }
+    else if (memcmp(sensorEmptyOffset, tempBuffer, LOGICAL_EM_EEPROM_SIZE) != 0)
+    {
+        Cy_SCB_UART_PutString(CYBSP_UART_HW, "EEPROM data verification failed: mismatch \r\n");
+    }
+    else
+    {
+        Cy_SCB_UART_PutString(CYBSP_UART_HW, "Calibration values stored and verified \r\n");
+    }
 }
 
-/********************************************************************************
+/*******************************************************************************
 * Function Name: handle_error
-*********************************************************************************
+********************************************************************************
 * Summary:
 * This function processes unrecoverable errors such as any component
 * initialization errors etc. In case of such error the system will
@@ -214,23 +225,22 @@ void store_calibration(void)
 ********************************************************************************/
 void handle_error(uint32_t status, char *message)
 {
-    if(CY_EM_EEPROM_SUCCESS != status)
+    if (CY_EM_EEPROM_SUCCESS != status)
     {
         __disable_irq();
-        if(NULL != message)
+        if (NULL != message)
         {
             Cy_SCB_UART_PutString(CYBSP_UART_HW, message);
         }
-        while(1u);
+        while (1u);
     }
-
 }
 
 /*******************************************************************************
 * Function Name: display_cur_liquid_level
 ********************************************************************************
 * Summary:
-* This function displays the the current liquid level in percent and mm in the
+* This function displays the current liquid level in percent and mm in the
 * UART terminal.
 *
 * Parameters:
@@ -243,7 +253,7 @@ void display_cur_liquid_level(void)
 {
     uint8_t i;
     
-    if(uartTxMode == UART_BASIC)
+    if (uartTxMode == UART_BASIC)
     {
         /* Transmit current liquid level Percent */
         Cy_SCB_UART_PutString(CYBSP_UART_HW, "%=");
@@ -262,7 +272,7 @@ void display_cur_liquid_level(void)
     {
         if (uartTxMode == UART_CSVINIT)
         {
-            for(i = 0; i < NUMSENSORS; i++)
+            for (i = 0; i < NUMSENSORS; i++)
             {
                 Cy_SCB_UART_PutString(CYBSP_UART_HW, "Raw");
                 display_decimal_val(i, 0);
@@ -272,39 +282,35 @@ void display_cur_liquid_level(void)
                 Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
                 Cy_SCB_UART_PutString(CYBSP_UART_HW, "Proc");
                 display_decimal_val(i, 0);
-                Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");                            
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
             }
             Cy_SCB_UART_PutString(CYBSP_UART_HW, "SenActCnt,");
-
             Cy_SCB_UART_PutString(CYBSP_UART_HW, "Level%, LevelMm");
             Cy_SCB_UART_PutString(CYBSP_UART_HW, "\r\n");
             uartTxMode = UART_CSV;
         }
         else
         {
-            for(i = 0; i < NUMSENSORS; i++)
+            for (i = 0; i < NUMSENSORS; i++)
             {
                 display_decimal_val(sensorRaw[i], 0);
                 Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
                 display_decimal_val(sensorDiff[i], 0);
                 Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
                 display_decimal_val(sensorProcessed[i], 0);
-                Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");                             
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
             }
             display_decimal_val(sensorActiveCount, 0);
             Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
-
             display_decimal_fixed_val(levelPercent, 8, 1);
             Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
             /* Transmit current liquid level mm */
             display_decimal_fixed_val(levelMm, 8, 1);
             Cy_SCB_UART_PutString(CYBSP_UART_HW, "\r\n");
         }
-
     }
-
     
-    /* Looking for UART commands. */
+    /* Looking for UART commands */
     receive_uart_cmd();
     /* Check if test UART message should be sent */
     display_next_level_val();
@@ -325,7 +331,7 @@ void display_cur_liquid_level(void)
 void receive_uart_cmd(void)
 {
     static uint16_t bufferIndex = 0;
-    static char rxBuffer[32]= {'\0'};
+    static char rxBuffer[32] = {'\0'};
     uint32_t read_data = 0;
 
     /* Check if there is a received character from user console */
@@ -334,59 +340,57 @@ void receive_uart_cmd(void)
         /* Re-transmit whatever the user types on the console */
         read_data = Cy_SCB_UART_Get(CYBSP_UART_HW);
 
-        if(read_data > '0')
+        if (read_data >= ' ' && read_data <= '~') /* Printable ASCII characters */
         {
             while (0UL == Cy_SCB_UART_Put(CYBSP_UART_HW, read_data))
             {
-
             }
             rxBuffer[bufferIndex] = read_data;
             bufferIndex++;
         }
-        if((read_data == '\r') || (read_data == '\n'))
+        if ((read_data == '\r') || (read_data == '\n'))
         {
             rxBuffer[bufferIndex] = '\0';
-            if(strcmp("cal", rxBuffer) == 0)
+            if (strcmp("cal", rxBuffer) == 0)
             {
                 cal_flag = TRUE;
             }
-            else if(strcmp("stop", rxBuffer) == 0)
+            else if (strcmp("stop", rxBuffer) == 0)
             {
                 uartTxMode = UART_NONE;
             }
-            else if(strcmp("csv", rxBuffer) == 0)
+            else if (strcmp("csv", rxBuffer) == 0)
             {
                 uartTxMode = UART_CSVINIT;
             }
-            else if(strcmp("basic", rxBuffer) == 0)
+            else if (strcmp("basic", rxBuffer) == 0)
             {
                 uartTxMode = UART_BASIC;
             }
-            else if(strcmp("", rxBuffer) == 0)
+            else if (bufferIndex == 0) /* Empty input (just Enter) */
             {
                 storeSampleFlag = TRUE;
                 uartTxMode = UART_NONE;
             }
-            else if((strcmp("reset", rxBuffer) == 0))
+            else if (strcmp("reset", rxBuffer) == 0)
             {
                 resetSampleFlag = TRUE;
                 uartTxMode = UART_NONE;
             }
             else
             {
-                Cy_SCB_UART_PutString(CYBSP_UART_HW, "Command Error");
-                Cy_SCB_UART_PutString(CYBSP_UART_HW, "\r\n");
+                Cy_SCB_UART_PutString(CYBSP_UART_HW, "Command Error\r\n");
             }
 
             bufferIndex = 0;
-            memset(rxBuffer, '\0', strlen(rxBuffer));
+            memset(rxBuffer, '\0', sizeof(rxBuffer));
         }
-
     }
 }
-/********************************************************************************
+
+/*******************************************************************************
 * Function Name: display_decimal_fixed_val
-*********************************************************************************
+********************************************************************************
 * Summary:
 * This function displays the decimal representation of a fixed precision int32_t
 * variable.
@@ -407,11 +411,11 @@ void display_decimal_fixed_val(int32_t number, uint8_t fixed_shift, uint8_t num_
     int32_t dec_digits = 1;
 
     /* Check for out of range parameters */
-    if(fixed_shift > 31)
+    if (fixed_shift > 31)
     {
         fixed_shift = 31;
     }
-    if(num_decimal > 9)
+    if (num_decimal > 9)
     {
         num_decimal = 9;
     }
@@ -419,12 +423,12 @@ void display_decimal_fixed_val(int32_t number, uint8_t fixed_shift, uint8_t num_
     /* Display whole number part of value */
     display_decimal_val(number >> fixed_shift, 0);
     /* Display fractional part of number if required */
-    if(num_decimal > 0)
+    if (num_decimal > 0)
     {
         Cy_SCB_UART_Put(CYBSP_UART_HW, '.');
         dec_digits = 1;
         /* Calculate fractional portion scaling multiplier */
-        for(i = 0; i < num_decimal; i++)
+        for (i = 0; i < num_decimal; i++)
         {
             dec_digits *= 10;
         }
@@ -437,7 +441,7 @@ void display_decimal_fixed_val(int32_t number, uint8_t fixed_shift, uint8_t num_
 * Function Name: display_next_level_val
 ********************************************************************************
 * Summary:
-* This function displays the the next set of level values from the sample array
+* This function displays the next set of level values from the sample array
 * in the UART terminal.
 *
 * Parameters:
@@ -452,14 +456,14 @@ void display_next_level_val(void)
     static uint16_t sampleIndex;
 
     /* Check if we should output sensor level data */
-    if(storeSampleFlag == TRUE)
+    if (storeSampleFlag == TRUE)
     {
         uartTxMode = UART_NONE;
 
-        if(sampleIndex == 0)
+        if (sampleIndex == 0)
         {
             Cy_SCB_UART_PutString(CYBSP_UART_HW, "PresetMm,");
-            for(i = 1; i < NUMSENSORS; i++)
+            for (i = 1; i < NUMSENSORS; i++)
             {
                 Cy_SCB_UART_PutString(CYBSP_UART_HW, "SenDiff");
                 display_decimal_val(i, 0);
@@ -470,7 +474,7 @@ void display_next_level_val(void)
         }
         display_decimal_val(arrayAxisLabel[sampleIndex], 0);
         Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
-        for(i = 1; i < NUMSENSORS; i++)
+        for (i = 1; i < NUMSENSORS; i++)
         {
             display_decimal_val(sensorProcessed[i], 0);
             Cy_SCB_UART_PutString(CYBSP_UART_HW, ",");
@@ -483,7 +487,7 @@ void display_next_level_val(void)
 
         /* Increment and limit array index */
         sampleIndex += 1;
-        if(sampleIndex >= NUM_SAMPLES)
+        if (sampleIndex >= NUM_SAMPLES)
         {
             sampleIndex = NUM_SAMPLES - 1;
         }
@@ -492,16 +496,14 @@ void display_next_level_val(void)
         storeSampleFlag = FALSE;
     }
     /* Check if we should reset for a new test sequence */
-    if(resetSampleFlag == TRUE)
+    if (resetSampleFlag == TRUE)
     {
         sampleIndex = 0;
-        Cy_SCB_UART_PutString(CYBSP_UART_HW, "Reset Test Level");
-        Cy_SCB_UART_PutString(CYBSP_UART_HW, "\r\n");
+        Cy_SCB_UART_PutString(CYBSP_UART_HW, "Reset Test Level\r\n");
         /* Clear flags to allow user to press for next store request */
         resetSampleFlag = FALSE;
         storeSampleFlag = FALSE;
     }
 }
-
 
 /* [] END OF FILE */
